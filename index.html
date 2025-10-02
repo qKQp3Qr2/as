@@ -271,6 +271,26 @@
                 modelGroup.add(footprintMesh);
             }
 
+            if (maxHeight > H + 1e-3) {
+                const zAtCurrent = frontZ - (H / slopeRatio);
+                const zAtMax = frontZ - (maxHeight / slopeRatio);
+                const extensionGeo = new THREE.BufferGeometry();
+                const extensionVertices = new Float32Array([
+                    -halfWidth, H, zAtCurrent,
+                    halfWidth, H, zAtCurrent,
+                    -halfWidth, maxHeight, zAtMax,
+
+                    -halfWidth, maxHeight, zAtMax,
+                    halfWidth, H, zAtCurrent,
+                    halfWidth, maxHeight, zAtMax
+                ]);
+                extensionGeo.setAttribute("position", new THREE.BufferAttribute(extensionVertices, 3));
+                extensionGeo.computeVertexNormals();
+                const extensionMat = new THREE.MeshStandardMaterial({ color: 0x8b5cf6, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
+                const extensionMesh = new THREE.Mesh(extensionGeo, extensionMat);
+                modelGroup.add(extensionMesh);
+            }
+
             const setbackLineGeo = new THREE.BufferGeometry().setFromPoints([
                 new THREE.Vector3(-width / 2, 0.02, -D),
                 new THREE.Vector3(width / 2, 0.02, -D)
