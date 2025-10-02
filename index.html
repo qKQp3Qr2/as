@@ -225,8 +225,8 @@
             heightPlaneMesh.position.set(0, H, 0);
             modelGroup.add(heightPlaneMesh);
 
-            const distance = Math.min(Math.max(controlDistance ?? Sw, 0), Sw);
-            const controlZ = Sw - distance;
+            const distance = Math.min(Math.max(controlDistance ?? 0, 0), Sw);
+            const controlZ = distance;
             const usableHeight = Math.min(params.Hlimit, params.slopeHeight ?? controlHeight ?? params.Hlimit);
             const halfWidth = width / 2;
 
@@ -293,8 +293,8 @@
                 return 0;
             }
 
-            const distance = Math.min(Math.max(params.controlDistance ?? params.Sw ?? 0, 0), params.Sw ?? 0);
-            const frontZ = (params.Sw ?? 0) - distance;
+            const distance = Math.min(Math.max(params.controlDistance ?? 0, 0), params.Sw ?? 0);
+            const frontZ = distance;
             const slopeRun = usableHeight / slopeRatio;
             const backZ = frontZ - slopeRun;
 
