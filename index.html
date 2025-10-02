@@ -195,7 +195,7 @@
             scene.add(modelGroup);
 
             const totalDepth = Sw + D + depth;
-            const planeGeo = new THREE.PlaneGeometry(Math.max(width, L) + 20, totalDepth + 20);
+            const planeGeo = new THREE.PlaneGeometry(L, totalDepth + 20);
             planeGeo.rotateX(-Math.PI / 2);
             planeGeo.translate(0, 0, (Sw - D - depth) / 2);
             const planeMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0, roughness: 0.9, side: THREE.DoubleSide });
@@ -217,7 +217,7 @@
             buildMesh.position.set(0, H / 2, -D - depth / 2);
             modelGroup.add(buildMesh);
 
-            const heightPlaneGeo = new THREE.PlaneGeometry(Math.max(width, L) + 20, totalDepth + 20);
+            const heightPlaneGeo = new THREE.PlaneGeometry(L, totalDepth + 20);
             heightPlaneGeo.rotateX(-Math.PI / 2);
             heightPlaneGeo.translate(0, 0, (Sw - D - depth) / 2);
             const heightPlaneMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, transparent: true, opacity: 0.35, side: THREE.DoubleSide });
@@ -227,7 +227,7 @@
 
             const maxHeight = params.Hlimit ?? H;
             if (maxHeight > 0) {
-                const maxPlaneGeo = new THREE.PlaneGeometry(Math.max(width, L) + 20, totalDepth + 20);
+                const maxPlaneGeo = new THREE.PlaneGeometry(L, totalDepth + 20);
                 maxPlaneGeo.rotateX(-Math.PI / 2);
                 maxPlaneGeo.translate(0, 0, (Sw - D - depth) / 2);
                 const maxPlaneMat = new THREE.MeshStandardMaterial({ color: 0xef4444, transparent: true, opacity: 0.25, side: THREE.DoubleSide });
