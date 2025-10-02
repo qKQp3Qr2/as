@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>A/S 檢討 3D 模擬</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: "Noto Sans TC", "Segoe UI", sans-serif;
+        }
+
+        #controls {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            background: rgba(255, 255, 255, 0.96);
+            border-radius: 12px;
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+            padding: 16px 20px;
+            width: 260px;
+            z-index: 10;
+        }
+
+        #controls h1 {
+            margin: 0 0 12px;
+            font-size: 20px;
+        }
+
+        #controls label {
+            display: block;
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+
+        #controls input[type="number"] {
+            width: 100%;
+            box-sizing: border-box;
+            margin-top: 4px;
+            padding: 6px 8px;
+            border-radius: 6px;
+            border: 1px solid #d0d7de;
+            font-size: 13px;
+        }
+
+        #controls button {
+            margin-top: 8px;
+            width: 100%;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: none;
+            background: #2563eb;
+            color: #fff;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        #controls button:hover {
+            background: #1d4ed8;
+        }
+
+        #results {
+            margin-top: 12px;
+            padding: 12px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        #legend {
+            position: absolute;
+            bottom: 16px;
+            left: 16px;
+            background: rgba(15, 23, 42, 0.82);
+            color: #e2e8f0;
+            padding: 10px 14px;
+            font-size: 12px;
+            border-radius: 8px;
+            line-height: 1.6;
+            z-index: 8;
+        }
+
+        #legend span {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            margin-right: 6px;
+            border-radius: 3px;
+        }
+
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="controls">
+        <h1>A/S 檢討 3D 模擬</h1>
+        <label>
+            基地沿路長 L (m)
+            <input id="inputL" type="number" min="1" value="50" step="1">
+        </label>
+        <label>
+            道路寬度 Sw (m)
+            <input id="inputSw" type="number" min="1" value="20" step="1">
+        </label>
+        <label>
+            退縮距離 D (m)
+            <input id="inputD" type="number" min="0" value="6" step="0.5">
+        </label>
+        <label>
+            建築高度 H (m)
+            <input id="inputH" type="number" min="1" value="0" step="0.1" readonly>
+        </label>
+        <label>
+            建築深度 T (m)
+            <input id="inputDepth" type="number" min="5" value="30" step="1">
+        </label>
+        <label>
+            建築沿路寬度 W (m)
+            <input id="inputWidth" type="number" min="5" value="40" step="1">
+        </label>
+        <button id="updateBtn">更新模型</button>
+        <div id="results"></div>
+    </div>
+
+    <div id="legend">
+        <div><span style="background:#94a3b8;"></span>基地/道路平面</div>
+        <div><span style="background:#2563eb;"></span>建築量體</div>
+        <div><span style="background:#22c55e;"></span>建築高度水平面</div>
+        <div><span style="background:#f59e0b;"></span>三比六斜率控制面</div>
+    </div>
+
+    <canvas id="scene"></canvas>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from "three";
+        import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+        const canvas = document.getElementById("scene");
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf1f5f9);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 4000);
+        camera.position.set(140, 120, 160);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.target.set(0, 0, 0);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
+        dirLight.position.set(200, 300, 200);
+        scene.add(dirLight);
+
+        const grid = new THREE.GridHelper(400, 40, 0x94a3b8, 0xcbd5f5);
+        grid.rotation.x = Math.PI / 2;
+        grid.position.y = -0.1;
+        scene.add(grid);
+
+        const axes = new THREE.AxesHelper(80);
+        axes.position.y = 0.1;
+        scene.add(axes);
+
+        let modelGroup = null;
+
+        function buildModel(params) {
+            const { L, Sw, D, H, depth, width, controlDistance, controlHeight } = params;
+            if (modelGroup) {
+                scene.remove(modelGroup);
+            }
+
+            modelGroup = new THREE.Group();
+            scene.add(modelGroup);
+
+            const totalDepth = Sw + D + depth;
+            const planeGeo = new THREE.PlaneGeometry(Math.max(width, L) + 20, totalDepth + 20);
+            planeGeo.rotateX(-Math.PI / 2);
+            planeGeo.translate(0, 0, (Sw - D - depth) / 2);
+            const planeMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0, roughness: 0.9, side: THREE.DoubleSide });
+            const planeMesh = new THREE.Mesh(planeGeo, planeMat);
+            modelGroup.add(planeMesh);
+
+            const roadGeo = new THREE.PlaneGeometry(L, Sw);
+            roadGeo.rotateX(-Math.PI / 2);
+            roadGeo.translate(0, 0.05, Sw / 2);
+            const roadMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, side: THREE.DoubleSide });
+            const roadMesh = new THREE.Mesh(roadGeo, roadMat);
+            modelGroup.add(roadMesh);
+
+            const buildingColor = H <= params.Hlimit ? 0x2563eb : 0xef4444;
+            const buildGeo = new THREE.BoxGeometry(width, H, depth);
+            const buildMat = new THREE.MeshStandardMaterial({ color: buildingColor, transparent: true, opacity: 0.85 });
+            const buildMesh = new THREE.Mesh(buildGeo, buildMat);
+            buildMesh.position.set(0, H / 2, -D - depth / 2);
+            modelGroup.add(buildMesh);
+
+            const heightPlaneGeo = new THREE.PlaneGeometry(Math.max(width, L) + 20, totalDepth + 20);
+            heightPlaneGeo.rotateX(-Math.PI / 2);
+            heightPlaneGeo.translate(0, 0, (Sw - D - depth) / 2);
+            const heightPlaneMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, transparent: true, opacity: 0.35, side: THREE.DoubleSide });
+            const heightPlaneMesh = new THREE.Mesh(heightPlaneGeo, heightPlaneMat);
+            heightPlaneMesh.position.set(0, H, 0);
+            modelGroup.add(heightPlaneMesh);
+
+            const distance = Math.min(Math.max(controlDistance ?? Sw, 0), Sw);
+            const controlZ = Sw - distance;
+            const usableHeight = Math.min(params.Hlimit, controlHeight ?? params.Hlimit);
+            const halfWidth = width / 2;
+
+            const slopeRatio = 3.6;
+            const slopeRun = usableHeight > 0 ? usableHeight / slopeRatio : 0;
+            const frontZ = controlZ;
+            const backZ = frontZ - slopeRun;
+
+            const controlGeo = new THREE.BufferGeometry();
+            const controlVertices = new Float32Array([
+                -halfWidth, 0, frontZ,
+                halfWidth, 0, frontZ,
+                -halfWidth, usableHeight, backZ,
+
+                -halfWidth, usableHeight, backZ,
+                halfWidth, 0, frontZ,
+                halfWidth, usableHeight, backZ
+            ]);
+            controlGeo.setAttribute("position", new THREE.BufferAttribute(controlVertices, 3));
+            controlGeo.computeVertexNormals();
+            const controlMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.35, side: THREE.DoubleSide });
+            const controlMesh = new THREE.Mesh(controlGeo, controlMat);
+            modelGroup.add(controlMesh);
+
+            if (slopeRun > 0) {
+                const footprintGeo = new THREE.PlaneGeometry(width, slopeRun);
+                footprintGeo.rotateX(-Math.PI / 2);
+                footprintGeo.translate(0, 0.03, frontZ - slopeRun / 2);
+                const footprintMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.25, side: THREE.DoubleSide });
+                const footprintMesh = new THREE.Mesh(footprintGeo, footprintMat);
+                modelGroup.add(footprintMesh);
+            }
+
+            const setbackLineGeo = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(-width / 2, 0.02, -D),
+                new THREE.Vector3(width / 2, 0.02, -D)
+            ]);
+            const setbackLineMat = new THREE.LineBasicMaterial({ color: 0x0f172a, linewidth: 2 });
+            const setbackLine = new THREE.Line(setbackLineGeo, setbackLineMat);
+            modelGroup.add(setbackLine);
+        }
+
+        function computeResults(params) {
+            const { L, Sw, D, H } = params;
+            const AsLimit = (L * Sw) / 2;
+            const Hlimit = 3.6 * (Sw + D);
+            const horizontalReach = Math.max(0, 2 * H - D);
+            const actualBase = Math.min(Sw, horizontalReach);
+            const AsActual = 0.5 * L * actualBase;
+
+            return {
+                AsLimit,
+                Hlimit,
+                AsActual,
+                actualBase,
+                horizontalReach
+            };
+        }
+
+        function formatNumber(num) {
+            return num.toLocaleString(undefined, { maximumFractionDigits: 2 });
+        }
+
+        function update() {
+            const widthInput = document.getElementById("inputWidth");
+            const heightInput = document.getElementById("inputH");
+
+            const params = {
+                L: Number(document.getElementById("inputL").value) || 1,
+                Sw: Number(document.getElementById("inputSw").value) || 1,
+                D: Number(document.getElementById("inputD").value) || 0,
+                depth: Number(document.getElementById("inputDepth").value) || 5,
+                width: Number(widthInput.value) || 5
+            };
+
+            params.H = 3.6 * (params.Sw + params.D);
+            if (heightInput) {
+                heightInput.value = params.H.toFixed(2);
+            }
+
+            if (params.width > params.L) {
+                params.width = params.L;
+                widthInput.value = params.width;
+            }
+
+            const results = computeResults(params);
+            params.Hlimit = results.Hlimit;
+
+            const rawDistance = params.width > 0 ? results.AsActual / params.width : 0;
+            const controlDistance = Math.min(Math.max(rawDistance, 0), params.Sw);
+            params.controlDistance = controlDistance;
+            params.controlHeight = Math.min(3.6 * (controlDistance + params.D), results.Hlimit);
+
+            const slopeRun = params.controlHeight > 0 ? params.controlHeight / 3.6 : 0;
+            params.slopeRun = slopeRun;
+
+            buildModel(params);
+
+            const AsOk = results.AsActual <= results.AsLimit;
+            const HOk = params.H <= results.Hlimit;
+
+            const AsBar = `${formatNumber(results.AsActual)} / ${formatNumber(results.AsLimit)} m²`;
+            const HBar = `${formatNumber(params.H)} / ${formatNumber(results.Hlimit)} m`;
+
+            document.getElementById("results").innerHTML = `
+                <b>檢核結果</b><br>
+                A/S 限制：${formatNumber(results.AsLimit)} m²<br>
+                估算投影面積：${formatNumber(results.AsActual)} m² (${AsOk ? "✓ 合格" : "✗ 超出"})<br>
+                建築高度：${formatNumber(params.H)} m (公式 3.6 × (Sw + D))<br>
+                高度限制：${formatNumber(results.Hlimit)} m<br>
+                估算陰影水平展開：${formatNumber(results.actualBase)} m<br>
+                斜率控制距離：${formatNumber(controlDistance)} m (As / W)<br>
+                斜率面投影長度：${formatNumber(params.slopeRun)} m (固定斜率 3.6)<br>
+                (2H - D) 水平長度：${formatNumber(results.horizontalReach)} m<br>
+                <hr>
+                A/S 比值：${AsBar}<br>
+                高度比值：${HBar}
+            `;
+
+            controls.target.set(0, Math.min(params.H / 2, 80), -params.depth / 2);
+        }
+
+        document.getElementById("updateBtn").addEventListener("click", update);
+        ["inputL", "inputSw", "inputD", "inputDepth", "inputWidth"].forEach(id => {
+            document.getElementById(id).addEventListener("change", update);
+        });
+
+        window.addEventListener("resize", () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        update();
+        animate();
+    </script>
+</body>
+
+</html>
