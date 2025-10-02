@@ -465,6 +465,57 @@
                     }
                 )
             );
+
+            dimensionGroup.add(
+                createDimensionLine(
+                    new THREE.Vector3(width / 2 + 1.4, 0.12, 0),
+                    new THREE.Vector3(width / 2 + 1.4, 0.12, Sw),
+                    `道路寬度 Sw = ${formatNumber(Sw)} m`,
+                    {
+                        labelOffset: new THREE.Vector3(0, 2.6, 0),
+                        spriteOptions: { scale: 0.02, fontSize: 110 }
+                    }
+                )
+            );
+
+            dimensionGroup.add(
+                createDimensionLine(
+                    new THREE.Vector3(-width / 2 - 1.4, 0.12, 0),
+                    new THREE.Vector3(-width / 2 - 1.4, 0.12, params.controlDistance),
+                    `斜率控制距離 = ${formatNumber(params.controlDistance)} m`,
+                    {
+                        labelOffset: new THREE.Vector3(0, 2.6, 0),
+                        spriteOptions: { scale: 0.02, fontSize: 110 }
+                    }
+                )
+            );
+
+            dimensionGroup.add(
+                createDimensionLine(
+                    new THREE.Vector3(-L / 2, 0.12, Sw + 2),
+                    new THREE.Vector3(L / 2, 0.12, Sw + 2),
+                    `基地沿路長 L = ${formatNumber(L)} m`,
+                    {
+                        labelOffset: new THREE.Vector3(0, 2.8, 0),
+                        spriteOptions: { scale: 0.02, fontSize: 110 }
+                    }
+                )
+            );
+
+            if (params.Hlimit > 0) {
+                dimensionGroup.add(
+                    createDimensionLine(
+                        new THREE.Vector3(-width / 2 - 2.4, 0, -D - depth / 2),
+                        new THREE.Vector3(-width / 2 - 2.4, params.Hlimit, -D - depth / 2),
+                        `高度限制 Hlimit = ${formatNumber(params.Hlimit)} m`,
+                        {
+                            labelOffset: new THREE.Vector3(-2.2, 0, 0),
+                            spriteOptions: { scale: 0.02, fontSize: 110 },
+                            markerSize: 1.2
+                        }
+                    )
+                );
+            }
         }
 
         function computeResults(params) {
