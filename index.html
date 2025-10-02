@@ -185,7 +185,7 @@
 
         function createTextSprite(message, options = {}) {
             const {
-                fontSize = 64,
+                fontSize = 96,
                 padding = 28,
                 backgroundColor = "rgba(15, 23, 42, 0.85)",
                 textColor = "#f8fafc",
@@ -424,7 +424,7 @@
                     `沿路寬度 W = ${formatNumber(width)} m`,
                     {
                         labelOffset: new THREE.Vector3(0, 2.8, 0),
-                        spriteOptions: { scale: 0.015, fontSize: 64 }
+                        spriteOptions: { scale: 0.02, fontSize: 110 }
                     }
                 )
             );
@@ -436,7 +436,7 @@
                     `建築深度 T = ${formatNumber(depth)} m`,
                     {
                         labelOffset: new THREE.Vector3(0, 2.6, 0),
-                        spriteOptions: { scale: 0.015, fontSize: 64 }
+                        spriteOptions: { scale: 0.02, fontSize: 110 }
                     }
                 )
             );
@@ -448,7 +448,7 @@
                     `退縮距離 D = ${formatNumber(D)} m`,
                     {
                         labelOffset: new THREE.Vector3(0, 2.6, 0),
-                        spriteOptions: { scale: 0.015, fontSize: 64 }
+                        spriteOptions: { scale: 0.02, fontSize: 110 }
                     }
                 )
             );
@@ -460,7 +460,7 @@
                     `建築高度 H = ${formatNumber(H)} m`,
                     {
                         labelOffset: new THREE.Vector3(2.4, 0, 0),
-                        spriteOptions: { scale: 0.015, fontSize: 64 },
+                        spriteOptions: { scale: 0.02, fontSize: 110 },
                         markerSize: 1.2
                     }
                 )
