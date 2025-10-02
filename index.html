@@ -186,7 +186,7 @@
         let modelGroup = null;
 
         function buildModel(params) {
-            const { L, Sw, D, H, depth, width, controlDistance, controlHeight } = params;
+            const { L, Sw, D, H, depth, width, controlDistance, controlHeight, slopeLimitAtFront } = params;
             if (modelGroup) {
                 scene.remove(modelGroup);
             }
@@ -209,7 +209,8 @@
             const roadMesh = new THREE.Mesh(roadGeo, roadMat);
             modelGroup.add(roadMesh);
 
-            const buildingColor = H <= params.Hlimit ? 0x2563eb : 0xef4444;
+            const slopeAllowance = slopeLimitAtFront ?? params.Hlimit ?? H;
+            const buildingColor = H <= Math.min(params.Hlimit ?? H, slopeAllowance) + 1e-3 ? 0x2563eb : 0xef4444;
             const buildGeo = new THREE.BoxGeometry(width, H, depth);
             const buildMat = new THREE.MeshStandardMaterial({ color: buildingColor, transparent: true, opacity: 0.85 });
             const buildMesh = new THREE.Mesh(buildGeo, buildMat);
@@ -285,6 +286,29 @@
             };
         }
 
+        function computeSlopeHeightAtZ(z, params) {
+            const slopeRatio = 3.6;
+            const usableHeight = Math.max(0, params.usableSlopeHeight ?? params.Hlimit ?? 0);
+            if (usableHeight === 0) {
+                return 0;
+            }
+
+            const distance = Math.min(Math.max(params.controlDistance ?? params.Sw ?? 0, 0), params.Sw ?? 0);
+            const frontZ = (params.Sw ?? 0) - distance;
+            const slopeRun = usableHeight / slopeRatio;
+            const backZ = frontZ - slopeRun;
+
+            if (z >= frontZ) {
+                return 0;
+            }
+
+            if (z <= backZ) {
+                return usableHeight;
+            }
+
+            return (frontZ - z) * slopeRatio;
+        }
+
         function formatNumber(num) {
             return num.toLocaleString(undefined, { maximumFractionDigits: 2 });
         }
@@ -301,55 +325,87 @@
                 width: Number(widthInput.value) || 5
             };
 
-            params.H = 3.6 * (params.Sw + params.D);
-            if (heightInput) {
-                heightInput.value = params.H.toFixed(2);
-            }
-
             if (params.width > params.L) {
                 params.width = params.L;
                 widthInput.value = params.width;
             }
 
-            const results = computeResults(params);
-            params.Hlimit = results.Hlimit;
+            params.Hlimit = 3.6 * (params.Sw + params.D);
 
-            const rawDistance = params.width > 0 ? results.AsActual / params.width : 0;
-            const controlDistance = Math.min(Math.max(rawDistance, 0), params.Sw);
+            let trialH = params.Hlimit;
+            let controlDistance = 0;
+            let controlHeight = params.Hlimit;
+            let usableSlopeHeight = params.Hlimit;
+            let slopeLimitAtFront = params.Hlimit;
+            let slopeRun = 0;
+            let results = null;
+
+            for (let i = 0; i < 8; i++) {
+                results = computeResults({ ...params, H: trialH });
+                const rawDistance = params.width > 0 ? results.AsActual / params.width : 0;
+                controlDistance = Math.min(Math.max(rawDistance, 0), params.Sw);
+                controlHeight = Math.min(3.6 * (controlDistance + params.D), params.Hlimit);
+                usableSlopeHeight = Math.min(params.Hlimit, controlHeight);
+                slopeRun = usableSlopeHeight > 0 ? usableSlopeHeight / 3.6 : 0;
+                slopeLimitAtFront = computeSlopeHeightAtZ(-params.D, {
+                    Sw: params.Sw,
+                    controlDistance,
+                    usableSlopeHeight,
+                    Hlimit: params.Hlimit
+                });
+                const nextH = Math.min(params.Hlimit, slopeLimitAtFront);
+                if (Math.abs(nextH - trialH) < 1e-3) {
+                    trialH = nextH;
+                    break;
+                }
+                trialH = nextH;
+            }
+
+            params.H = trialH;
             params.controlDistance = controlDistance;
-            params.controlHeight = Math.min(3.6 * (controlDistance + params.D), results.Hlimit);
-            params.slopeHeight = params.Hlimit;
-
-            const slopeRun = params.slopeHeight > 0 ? params.slopeHeight / 3.6 : 0;
+            params.controlHeight = controlHeight;
+            params.usableSlopeHeight = usableSlopeHeight;
             params.slopeRun = slopeRun;
+            params.slopeLimitAtFront = slopeLimitAtFront;
+            params.slopeHeight = usableSlopeHeight;
+
+            if (heightInput) {
+                heightInput.value = params.H.toFixed(2);
+            }
+
+            results = computeResults(params);
 
             buildModel(params);
 
             const AsOk = results.AsActual <= results.AsLimit;
             const HOk = params.H <= results.Hlimit;
+            const slopeOk = params.H <= params.slopeLimitAtFront + 1e-3;
 
             const AsBar = `${formatNumber(results.AsActual)} / ${formatNumber(results.AsLimit)} m²`;
             const HBar = `${formatNumber(params.H)} / ${formatNumber(results.Hlimit)} m`;
+            const slopeLimitSafe = Math.max(params.slopeLimitAtFront ?? 0, 0);
+            const slopeBar = slopeLimitSafe > 0 ? `${formatNumber(params.H)} / ${formatNumber(slopeLimitSafe)} m` : "—";
 
             document.getElementById("results").innerHTML = `
                 <b>檢核結果</b><br>
                 A/S 限制：${formatNumber(results.AsLimit)} m²<br>
                 估算投影面積：${formatNumber(results.AsActual)} m² (${AsOk ? "✓ 合格" : "✗ 超出"})<br>
-                建築高度：${formatNumber(params.H)} m (公式 3.6 × (Sw + D))<br>
-                高度限制：${formatNumber(results.Hlimit)} m<br>
-                估算陰影水平展開：${formatNumber(results.actualBase)} m<br>
-                斜率控制距離：${formatNumber(controlDistance)} m (As / W)<br>
+                建築高度：${formatNumber(params.H)} m<br>
+                高度限制：${formatNumber(results.Hlimit)} m (${HOk ? "✓ 合格" : "✗ 超出"})<br>
+                斜率控制前緣高度：${formatNumber(params.slopeLimitAtFront)} m (${slopeOk ? "✓ 合格" : "✗ 超出"})<br>
+                建築可用高度來源：3.6 × (Sw + D) 與斜率控制取最小值
+                <br>估算陰影水平展開：${formatNumber(results.actualBase)} m<br>
+                斜率控制距離：${formatNumber(params.controlDistance)} m (As / W)<br>
                 斜率面投影長度：${formatNumber(params.slopeRun)} m (固定斜率 3.6)<br>
-                (2H - D) 水平長度：${formatNumber(results.horizontalReach)} m<br>
+                (2H - D) 水平長度：${formatNumber(results.horizontalReach)} m
                 <hr>
                 A/S 比值：${AsBar}<br>
-                高度比值：${HBar}
+                高度比值：${HBar}<br>
+                斜率比值：${slopeBar}
             `;
 
             controls.target.set(0, Math.min(params.H / 2, 80), -params.depth / 2);
         }
-
-        document.getElementById("updateBtn").addEventListener("click", update);
         ["inputL", "inputSw", "inputD", "inputDepth", "inputWidth"].forEach(id => {
             document.getElementById(id).addEventListener("change", update);
         });
