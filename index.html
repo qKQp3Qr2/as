@@ -225,6 +225,17 @@
             heightPlaneMesh.position.set(0, H, 0);
             modelGroup.add(heightPlaneMesh);
 
+            const maxHeight = params.Hlimit ?? H;
+            if (maxHeight > 0) {
+                const maxPlaneGeo = new THREE.PlaneGeometry(Math.max(width, L) + 20, totalDepth + 20);
+                maxPlaneGeo.rotateX(-Math.PI / 2);
+                maxPlaneGeo.translate(0, 0, (Sw - D - depth) / 2);
+                const maxPlaneMat = new THREE.MeshStandardMaterial({ color: 0xef4444, transparent: true, opacity: 0.25, side: THREE.DoubleSide });
+                const maxPlaneMesh = new THREE.Mesh(maxPlaneGeo, maxPlaneMat);
+                maxPlaneMesh.position.set(0, maxHeight, 0);
+                modelGroup.add(maxPlaneMesh);
+            }
+
             const distance = Math.min(Math.max(controlDistance ?? 0, 0), Sw);
             const controlZ = distance;
             const usableHeight = Math.min(params.Hlimit, params.slopeHeight ?? controlHeight ?? params.Hlimit);
