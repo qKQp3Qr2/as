@@ -226,7 +226,7 @@
 
             const distance = Math.min(Math.max(controlDistance ?? Sw, 0), Sw);
             const controlZ = Sw - distance;
-            const usableHeight = Math.min(params.Hlimit, controlHeight ?? params.Hlimit);
+            const usableHeight = Math.min(params.Hlimit, params.slopeHeight ?? controlHeight ?? params.Hlimit);
             const halfWidth = width / 2;
 
             const slopeRatio = 3.6;
@@ -318,8 +318,9 @@
             const controlDistance = Math.min(Math.max(rawDistance, 0), params.Sw);
             params.controlDistance = controlDistance;
             params.controlHeight = Math.min(3.6 * (controlDistance + params.D), results.Hlimit);
+            params.slopeHeight = params.Hlimit;
 
-            const slopeRun = params.controlHeight > 0 ? params.controlHeight / 3.6 : 0;
+            const slopeRun = params.slopeHeight > 0 ? params.slopeHeight / 3.6 : 0;
             params.slopeRun = slopeRun;
 
             buildModel(params);
