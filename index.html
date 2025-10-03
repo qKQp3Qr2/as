@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <title>建蔽率 & 容積率 3D 模擬</title>
+  <style>
+    body { margin:0; }
+    canvas { display:block; }
+    #controls {
+      position: absolute; top: 10px; left: 10px;
+      background: rgba(255,255,255,0.95); padding: 10px; font-family: sans-serif;
+      border-radius: 8px; box-shadow: 0 0 8px rgba(0,0,0,0.2);
+    }
+    #results {
+      margin-top: 10px;
+      font-size: 14px;
+      line-height: 1.4em;
+    }
+  </style>
+</head>
+<body>
+<div id="controls">
+  <label>基地面積 (m²): <input id="area" type="number" value="500"></label><br>
+  <label>建蔽率 (%): <input id="bcr" type="number" value="50"></label><br>
+  <label>容積率 (%): <input id="far" type="number" value="300"></label><br>
+  <button onclick="updateBuilding()">更新模型</button>
+  <div id="results"></div>
+</div>
+<canvas id="c"></canvas>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const renderer = new THREE.WebGLRenderer({canvas: document.querySelector("#c")});
+renderer.setSize(window.innerWidth, window.innerHeight);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf0f0f0);
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 1, 5000);
+camera.position.set(300, 300, 300);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+
+// 光源
+const light = new THREE.DirectionalLight(0xffffff, 1);
+light.position.set(200, 200, 200);
+scene.add(light);
+
+// 模型變數
+let baseMesh, buildingMesh;
+
+function createBuilding(A, BCR, FAR) {
+  if (baseMesh) scene.remove(baseMesh);
+  if (buildingMesh) scene.remove(buildingMesh);
+
+  const side = Math.sqrt(A); // 假設方形基地
+  const footprint = A * (BCR/100);
+  const footprintSide = Math.sqrt(footprint);
+
+  const totalFloorArea = A * (FAR/100);
+  const floors = Math.ceil(totalFloorArea / footprint); 
+  const height = floors * 3; // 每層 3m 高
+
+  // 基地
+  const baseGeo = new THREE.BoxGeometry(side, 2, side);
+  const baseMat = new THREE.MeshLambertMaterial({color: 0xcccccc});
+  baseMesh = new THREE.Mesh(baseGeo, baseMat);
+  baseMesh.position.y = -1;
+  scene.add(baseMesh);
+
+  // 建築量體
+  const buildGeo = new THREE.BoxGeometry(footprintSide, height, footprintSide);
+  const buildMat = new THREE.MeshLambertMaterial({color: 0x3399ff, opacity: 0.8, transparent: true});
+  buildingMesh = new THREE.Mesh(buildGeo, buildMat);
+  buildingMesh.position.y = height/2;
+  scene.add(buildingMesh);
+
+  // 更新數值顯示
+  document.getElementById("results").innerHTML = `
+    <b>計算結果</b><br>
+    基地面積：${A.toLocaleString()} m² <br>
+    可蓋建築面積 (BCR)：${footprint.toLocaleString(undefined,{maximumFractionDigits:2})} m² <br>
+    總樓地板面積上限 (FAR)：${totalFloorArea.toLocaleString(undefined,{maximumFractionDigits:2})} m² <br>
+    預估樓層數：約 ${floors} 層
+  `;
+}
+
+function updateBuilding(){
+  const A = parseFloat(document.getElementById("area").value);
+  const BCR = parseFloat(document.getElementById("bcr").value);
+  const FAR = parseFloat(document.getElementById("far").value);
+  createBuilding(A, BCR, FAR);
+}
+
+window.updateBuilding = updateBuilding;
+
+updateBuilding();
+
+function animate(){
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>
