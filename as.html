@@ -256,9 +256,17 @@
             };
 
             const color = options.color ?? 0x0f172a;
-            const lineMaterial = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.9 });
+            const renderOrder = options.renderOrder ?? 999;
+            const lineMaterial = new THREE.LineBasicMaterial({
+                color,
+                transparent: true,
+                opacity: 1.0,
+                depthTest: false,
+                depthWrite: false
+            });
             const lineGeometry = new THREE.BufferGeometry().setFromPoints([startVec, endVec]);
             const dimensionLine = new THREE.Line(lineGeometry, lineMaterial);
+            dimensionLine.renderOrder = renderOrder;
             group.add(dimensionLine);
             trackMaterial(lineMaterial);
 
@@ -292,8 +300,12 @@
                 const startMarkerMaterial = lineMaterial.clone();
                 const endMarkerMaterial = lineMaterial.clone();
 
-                group.add(new THREE.Line(startMarkerGeometry, startMarkerMaterial));
-                group.add(new THREE.Line(endMarkerGeometry, endMarkerMaterial));
+                const startMarker = new THREE.Line(startMarkerGeometry, startMarkerMaterial);
+                const endMarker = new THREE.Line(endMarkerGeometry, endMarkerMaterial);
+                startMarker.renderOrder = renderOrder;
+                endMarker.renderOrder = renderOrder;
+                group.add(startMarker);
+                group.add(endMarker);
 
                 trackMaterial(startMarkerMaterial);
                 trackMaterial(endMarkerMaterial);
