@@ -299,7 +299,7 @@
                 trackMaterial(endMarkerMaterial);
             }
 
-            const labelOffset = options.labelOffset ?? new THREE.Vector3(0, 2.2, 0);
+            const labelOffset = options.labelOffset ?? new THREE.Vector3(0, 4.6, 0);
             const labelOptions = options.labelOptions ?? options.spriteOptions ?? {};
             const labelObject = createTextLabel(label, labelOptions);
             const midPoint = startVec.clone().add(endVec).multiplyScalar(0.5).add(labelOffset);
@@ -560,7 +560,7 @@
                 new THREE.Vector3(width / 2, 0.12, -D),
                 `沿路寬度 W = ${formatNumber(width)} m`,
                 {
-                    labelOffset: new THREE.Vector3(0, 2.8, 0),
+                    labelOffset: new THREE.Vector3(0, 4.8, 0),
                     spriteOptions: { scale: 0.02, fontSize: 110 }
                 }
             );
@@ -572,7 +572,7 @@
                 new THREE.Vector3(width / 2 + 0.6, 0.12, -D - depth),
                 `建築深度 T = ${formatNumber(depth)} m`,
                 {
-                    labelOffset: new THREE.Vector3(0, 2.6, 0),
+                    labelOffset: new THREE.Vector3(0, 4.6, 0),
                     spriteOptions: { scale: 0.02, fontSize: 110 }
                 }
             );
@@ -584,7 +584,7 @@
                 new THREE.Vector3(-width / 2 - 0.6, 0.12, -D),
                 `退縮距離 D = ${formatNumber(D)} m`,
                 {
-                    labelOffset: new THREE.Vector3(0, 2.6, 0),
+                    labelOffset: new THREE.Vector3(0, 4.6, 0),
                     spriteOptions: { scale: 0.02, fontSize: 110 }
                 }
             );
@@ -596,7 +596,7 @@
                 new THREE.Vector3(width / 2, buildingHeight, -D - depth / 2),
                 `建築高度 BH = ${formatNumber(buildingHeight)} m`,
                 {
-                    labelOffset: new THREE.Vector3(2.4, 0, 0),
+                    labelOffset: new THREE.Vector3(4.6, 0, 0),
                     spriteOptions: { scale: 0.02, fontSize: 110 },
                     markerSize: 1.2
                 }
@@ -609,7 +609,7 @@
                 new THREE.Vector3(width / 2 + 1.4, 0.12, Sw),
                 `道路寬度 Sw = ${formatNumber(Sw)} m`,
                 {
-                    labelOffset: new THREE.Vector3(0, 2.6, 0),
+                    labelOffset: new THREE.Vector3(0, 4.6, 0),
                     spriteOptions: { scale: 0.02, fontSize: 110 }
                 }
             );
@@ -621,7 +621,7 @@
                 new THREE.Vector3(-width / 2 - 1.4, 0.12, params.controlDistance),
                 `斜率控制距離 = ${formatNumber(params.controlDistance)} m`,
                 {
-                    labelOffset: new THREE.Vector3(0, 2.6, 0),
+                    labelOffset: new THREE.Vector3(0, 4.6, 0),
                     spriteOptions: { scale: 0.02, fontSize: 110 }
                 }
             );
@@ -633,7 +633,7 @@
                 new THREE.Vector3(L / 2, 0.12, Sw + 2),
                 `基地沿路長 L = ${formatNumber(L)} m`,
                 {
-                    labelOffset: new THREE.Vector3(0, 2.8, 0),
+                    labelOffset: new THREE.Vector3(0, 4.8, 0),
                     spriteOptions: { scale: 0.02, fontSize: 110 }
                 }
             );
@@ -646,7 +646,7 @@
                     new THREE.Vector3(-width / 2 - 2.4, params.H, -D - depth / 2),
                     `高度限制 H = ${formatNumber(params.H)} m`,
                     {
-                        labelOffset: new THREE.Vector3(-2.2, 0, 0),
+                        labelOffset: new THREE.Vector3(-4.6, 0, 0),
                         spriteOptions: { scale: 0.02, fontSize: 110 },
                         markerSize: 1.2
                     }
