@@ -95,6 +95,20 @@
         canvas {
             display: block;
         }
+
+        .dimension-label {
+            font-family: "Noto Sans TC", "Segoe UI", sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            padding: 6px 10px;
+            background: rgba(15, 23, 42, 0.85);
+            color: #f8fafc;
+            border-radius: 12px;
+            pointer-events: none;
+            white-space: nowrap;
+            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.25);
+            border: 1px solid rgba(226, 232, 240, 0.18);
+        }
     </style>
 </head>
 
@@ -150,11 +164,21 @@
     <script type="module">
         import * as THREE from "three";
         import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+        import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 
         const canvas = document.getElementById("scene");
         const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setSize(window.innerWidth, window.innerHeight);
+
+        const labelRenderer = new CSS2DRenderer();
+        labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        labelRenderer.domElement.style.position = "absolute";
+        labelRenderer.domElement.style.top = "0";
+        labelRenderer.domElement.style.left = "0";
+        labelRenderer.domElement.style.pointerEvents = "none";
+        labelRenderer.domElement.style.zIndex = "5";
+        document.body.appendChild(labelRenderer.domElement);
 
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0xf1f5f9);
@@ -183,68 +207,29 @@
         axes.position.y = 0.1;
         scene.add(axes);
 
-        function createTextSprite(message, options = {}) {
+        function createTextLabel(message, options = {}) {
             const {
-                fontSize = 96,
-                padding = 28,
+                fontSize = "14px",
+                padding = "6px 10px",
                 backgroundColor = "rgba(15, 23, 42, 0.85)",
                 textColor = "#f8fafc",
-                borderRadius = 18,
-                scale = 0.012,
-                fontFamily = '"Noto Sans TC", "Segoe UI", sans-serif'
+                borderRadius = "12px",
+                fontFamily = '"Noto Sans TC", "Segoe UI", sans-serif',
+                fontWeight = "600"
             } = options;
 
-            const canvas = document.createElement("canvas");
-            const context = canvas.getContext("2d");
-            const ratio = window.devicePixelRatio || 1;
+            const element = document.createElement("div");
+            element.className = "dimension-label";
+            element.textContent = message;
+            element.style.fontSize = fontSize;
+            element.style.padding = padding;
+            element.style.background = backgroundColor;
+            element.style.color = textColor;
+            element.style.borderRadius = borderRadius;
+            element.style.fontFamily = fontFamily;
+            element.style.fontWeight = fontWeight;
 
-            context.font = `${fontSize}px ${fontFamily}`;
-            const metrics = context.measureText(message);
-            const textWidth = metrics.width;
-            const textHeight = fontSize;
-
-            const boxWidth = textWidth + padding * 2;
-            const boxHeight = textHeight + padding * 2;
-
-            canvas.width = Math.ceil(boxWidth * ratio);
-            canvas.height = Math.ceil(boxHeight * ratio);
-
-            context.scale(ratio, ratio);
-            context.font = `${fontSize}px ${fontFamily}`;
-            context.fillStyle = backgroundColor;
-
-            const drawRoundedRect = (ctx, x, y, width, height, radius) => {
-                const r = Math.min(radius, width / 2, height / 2);
-                ctx.beginPath();
-                ctx.moveTo(x + r, y);
-                ctx.lineTo(x + width - r, y);
-                ctx.quadraticCurveTo(x + width, y, x + width, y + r);
-                ctx.lineTo(x + width, y + height - r);
-                ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-                ctx.lineTo(x + r, y + height);
-                ctx.quadraticCurveTo(x, y + height, x, y + height - r);
-                ctx.lineTo(x, y + r);
-                ctx.quadraticCurveTo(x, y, x + r, y);
-                ctx.closePath();
-            };
-
-            drawRoundedRect(context, 0, 0, boxWidth, boxHeight, borderRadius);
-            context.fill();
-
-            context.fillStyle = textColor;
-            context.textAlign = "center";
-            context.textBaseline = "middle";
-            context.fillText(message, boxWidth / 2, boxHeight / 2);
-
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.colorSpace = THREE.SRGBColorSpace;
-            texture.needsUpdate = true;
-
-            const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
-            const sprite = new THREE.Sprite(spriteMaterial);
-            sprite.scale.set(boxWidth * scale, boxHeight * scale, 1);
-
-            return sprite;
+            return new CSS2DObject(element);
         }
 
         function createDimensionLine(start, end, label, options = {}) {
@@ -290,10 +275,11 @@
             }
 
             const labelOffset = options.labelOffset ?? new THREE.Vector3(0, 2.2, 0);
-            const labelSprite = createTextSprite(label, options.spriteOptions ?? {});
+            const labelOptions = options.labelOptions ?? options.spriteOptions ?? {};
+            const labelObject = createTextLabel(label, labelOptions);
             const midPoint = startVec.clone().add(endVec).multiplyScalar(0.5).add(labelOffset);
-            labelSprite.position.copy(midPoint);
-            group.add(labelSprite);
+            labelObject.position.copy(midPoint);
+            group.add(labelObject);
 
             return group;
         }
@@ -645,12 +631,14 @@
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
+            labelRenderer.setSize(window.innerWidth, window.innerHeight);
         });
 
         function animate() {
             requestAnimationFrame(animate);
             controls.update();
             renderer.render(scene, camera);
+            labelRenderer.render(scene, camera);
         }
 
         update();
