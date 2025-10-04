@@ -629,15 +629,10 @@
             document.getElementById("results").innerHTML = `
                 <b>檢核結果</b><br>
                 A/S 限制：${formatNumber(results.AsLimit)} m²<br>
-                估算投影面積：${formatNumber(results.AsActual)} m²<br>
                 建築高度：${formatNumber(params.buildingHeight)} m<br>
                 高度限制：${formatNumber(results.H)} m<br>
-                斜率控制前緣高度：${formatNumber(params.slopeLimitAtFront)} m<br>
-                建築可用高度來源：3.6 × (Sw + D) 與斜率控制取最小值
-                <br>估算陰影水平展開：${formatNumber(results.actualBase)} m<br>
-                斜率控制距離：${formatNumber(params.controlDistance)} m (As / W)<br>
-                斜率面投影長度：${formatNumber(params.slopeRun)} m (固定斜率 3.6)<br>
-                (2H - D) 水平長度：${formatNumber(results.horizontalReach)} m
+                建築可用高度來源：3.6 × (Sw + D)<br>
+                與斜率控制取最小值
             `;
 
             controls.target.set(0, Math.min(params.buildingHeight / 2, 80), -params.depth / 2);
