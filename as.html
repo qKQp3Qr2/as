@@ -324,8 +324,8 @@
             const roadMesh = new THREE.Mesh(roadGeo, roadMat);
             modelGroup.add(roadMesh);
 
-            const slopeAllowance = slopeLimitAtFront ?? params.Hlimit ?? buildingHeight;
-            const buildingColor = buildingHeight <= Math.min(params.Hlimit ?? buildingHeight, slopeAllowance) + 1e-3 ? 0x2563eb : 0xef4444;
+            const slopeAllowance = slopeLimitAtFront ?? params.H ?? buildingHeight;
+            const buildingColor = buildingHeight <= Math.min(params.H ?? buildingHeight, slopeAllowance) + 1e-3 ? 0x2563eb : 0xef4444;
             const buildGeo = new THREE.BoxGeometry(width, buildingHeight, depth);
             const buildMat = new THREE.MeshStandardMaterial({ color: buildingColor, transparent: true, opacity: 0.85 });
             const buildMesh = new THREE.Mesh(buildGeo, buildMat);
@@ -340,7 +340,7 @@
             heightPlaneMesh.position.set(0, buildingHeight, 0);
             modelGroup.add(heightPlaneMesh);
 
-            const maxHeight = params.Hlimit ?? buildingHeight;
+            const maxHeight = params.H ?? buildingHeight;
             if (maxHeight > 0) {
                 const maxPlaneGeo = new THREE.PlaneGeometry(L, totalDepth + 20);
                 maxPlaneGeo.rotateX(-Math.PI / 2);
@@ -353,7 +353,7 @@
 
             const distance = Math.min(Math.max(controlDistance ?? 0, 0), Sw);
             const controlZ = distance;
-            const usableHeight = Math.min(params.Hlimit, params.slopeHeight ?? controlHeight ?? params.Hlimit);
+            const usableHeight = Math.min(params.H, params.slopeHeight ?? controlHeight ?? params.H);
             const halfWidth = width / 2;
 
             const slopeRatio = 3.6;
@@ -502,12 +502,12 @@
                 )
             );
 
-            if (params.Hlimit > 0) {
+            if (params.H > 0) {
                 dimensionGroup.add(
                     createDimensionLine(
                         new THREE.Vector3(-width / 2 - 2.4, 0, -D - depth / 2),
-                        new THREE.Vector3(-width / 2 - 2.4, params.Hlimit, -D - depth / 2),
-                        `高度限制 Hlimit = ${formatNumber(params.Hlimit)} m`,
+                        new THREE.Vector3(-width / 2 - 2.4, params.H, -D - depth / 2),
+                        `高度限制 H = ${formatNumber(params.H)} m`,
                         {
                             labelOffset: new THREE.Vector3(-2.2, 0, 0),
                             spriteOptions: { scale: 0.02, fontSize: 110 },
@@ -521,14 +521,14 @@
         function computeResults(params) {
             const { L, Sw, D, buildingHeight } = params;
             const AsLimit = (L * Sw) / 2;
-            const Hlimit = 3.6 * (Sw + D);
+            const H = 3.6 * (Sw + D);
             const horizontalReach = Math.max(0, 2 * buildingHeight - D);
             const actualBase = Math.min(Sw, horizontalReach);
             const AsActual = 0.5 * L * actualBase;
 
             return {
                 AsLimit,
-                Hlimit,
+                H,
                 AsActual,
                 actualBase,
                 horizontalReach
@@ -537,7 +537,7 @@
 
         function computeSlopeHeightAtZ(z, params) {
             const slopeRatio = 3.6;
-            const usableHeight = Math.max(0, params.usableSlopeHeight ?? params.Hlimit ?? 0);
+            const usableHeight = Math.max(0, params.usableSlopeHeight ?? params.H ?? 0);
             if (usableHeight === 0) {
                 return 0;
             }
@@ -579,13 +579,13 @@
                 widthInput.value = params.width;
             }
 
-            params.Hlimit = 3.6 * (params.Sw + params.D);
+            params.H = 3.6 * (params.Sw + params.D);
 
-            let trialBuildingHeight = params.Hlimit;
+            let trialBuildingHeight = params.H;
             let controlDistance = 0;
-            let controlHeight = params.Hlimit;
-            let usableSlopeHeight = params.Hlimit;
-            let slopeLimitAtFront = params.Hlimit;
+            let controlHeight = params.H;
+            let usableSlopeHeight = params.H;
+            let slopeLimitAtFront = params.H;
             let slopeRun = 0;
             let results = null;
 
@@ -593,16 +593,16 @@
                 results = computeResults({ ...params, buildingHeight: trialBuildingHeight });
                 const rawDistance = params.width > 0 ? results.AsActual / params.width : 0;
                 controlDistance = Math.min(Math.max(rawDistance, 0), params.Sw);
-                controlHeight = Math.min(3.6 * (controlDistance + params.D), params.Hlimit);
-                usableSlopeHeight = Math.min(params.Hlimit, controlHeight);
+                controlHeight = Math.min(3.6 * (controlDistance + params.D), params.H);
+                usableSlopeHeight = Math.min(params.H, controlHeight);
                 slopeRun = usableSlopeHeight > 0 ? usableSlopeHeight / 3.6 : 0;
                 slopeLimitAtFront = computeSlopeHeightAtZ(-params.D, {
                     Sw: params.Sw,
                     controlDistance,
                     usableSlopeHeight,
-                    Hlimit: params.Hlimit
+                    H: params.H
                 });
-                const nextBuildingHeight = Math.min(params.Hlimit, slopeLimitAtFront);
+                const nextBuildingHeight = Math.min(params.H, slopeLimitAtFront);
                 if (Math.abs(nextBuildingHeight - trialBuildingHeight) < 1e-3) {
                     trialBuildingHeight = nextBuildingHeight;
                     break;
@@ -631,7 +631,7 @@
                 A/S 限制：${formatNumber(results.AsLimit)} m²<br>
                 估算投影面積：${formatNumber(results.AsActual)} m²<br>
                 建築高度：${formatNumber(params.buildingHeight)} m<br>
-                高度限制：${formatNumber(results.Hlimit)} m<br>
+                高度限制：${formatNumber(results.H)} m<br>
                 斜率控制前緣高度：${formatNumber(params.slopeLimitAtFront)} m<br>
                 建築可用高度來源：3.6 × (Sw + D) 與斜率控制取最小值
                 <br>估算陰影水平展開：${formatNumber(results.actualBase)} m<br>
