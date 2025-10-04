@@ -371,6 +371,10 @@
                     material.color.setHex(defaults.color);
                     material.opacity = defaults.opacity;
                 });
+
+                if (interaction.element.parentElement) {
+                    interaction.element.parentElement.removeChild(interaction.element);
+                }
             }
         }
 
