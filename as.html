@@ -104,10 +104,18 @@
             background: rgba(15, 23, 42, 0.85);
             color: #f8fafc;
             border-radius: 12px;
-            pointer-events: none;
+            pointer-events: auto;
             white-space: nowrap;
             box-shadow: 0 6px 16px rgba(15, 23, 42, 0.25);
             border: 1px solid rgba(226, 232, 240, 0.18);
+            cursor: pointer;
+            transition: background 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .dimension-label.is-active {
+            background: rgba(249, 115, 22, 0.92);
+            box-shadow: 0 10px 28px rgba(249, 115, 22, 0.4);
+            border-color: rgba(249, 115, 22, 0.6);
         }
     </style>
 </head>
@@ -236,12 +244,23 @@
             const startVec = start.clone();
             const endVec = end.clone();
             const group = new THREE.Group();
+            const highlightMaterials = [];
+            const materialDefaults = [];
+
+            const trackMaterial = material => {
+                highlightMaterials.push(material);
+                materialDefaults.push({
+                    color: material.color.getHex(),
+                    opacity: material.opacity
+                });
+            };
 
             const color = options.color ?? 0x0f172a;
             const lineMaterial = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.9 });
             const lineGeometry = new THREE.BufferGeometry().setFromPoints([startVec, endVec]);
             const dimensionLine = new THREE.Line(lineGeometry, lineMaterial);
             group.add(dimensionLine);
+            trackMaterial(lineMaterial);
 
             const direction = new THREE.Vector3().subVectors(endVec, startVec);
             const length = direction.length();
@@ -270,8 +289,14 @@
                     endVec.clone().sub(cross)
                 ]);
 
-                group.add(new THREE.Line(startMarkerGeometry, lineMaterial.clone()));
-                group.add(new THREE.Line(endMarkerGeometry, lineMaterial.clone()));
+                const startMarkerMaterial = lineMaterial.clone();
+                const endMarkerMaterial = lineMaterial.clone();
+
+                group.add(new THREE.Line(startMarkerGeometry, startMarkerMaterial));
+                group.add(new THREE.Line(endMarkerGeometry, endMarkerMaterial));
+
+                trackMaterial(startMarkerMaterial);
+                trackMaterial(endMarkerMaterial);
             }
 
             const labelOffset = options.labelOffset ?? new THREE.Vector3(0, 2.2, 0);
@@ -281,14 +306,141 @@
             labelObject.position.copy(midPoint);
             group.add(labelObject);
 
+            const highlightColor = options.highlightColor ?? 0xf97316;
+            const highlightOpacity = options.highlightOpacity ?? 1;
+
+            const labelDefaults = {
+                background: labelObject.element.style.background,
+                color: labelObject.element.style.color,
+                boxShadow: labelObject.element.style.boxShadow,
+                borderColor: labelObject.element.style.borderColor
+            };
+
+            const labelHighlight = {
+                background: options.labelHighlightBackground ?? "rgba(249, 115, 22, 0.92)",
+                color: options.labelHighlightColor ?? "#fff",
+                boxShadow: options.labelHighlightShadow ?? "0 10px 28px rgba(249, 115, 22, 0.4)",
+                borderColor: options.labelHighlightBorder ?? "rgba(249, 115, 22, 0.6)"
+            };
+
+            group.userData.labelElement = labelObject.element;
+            group.userData.highlightConfig = {
+                materials: highlightMaterials,
+                defaults: materialDefaults,
+                highlightColor,
+                highlightOpacity,
+                labelDefaults,
+                labelHighlight
+            };
+
             return group;
         }
 
         let modelGroup = null;
+        const dimensionInteractions = [];
+        let activeInteraction = null;
+
+        function deactivateInteraction(interaction) {
+            interaction.element.classList.remove("is-active");
+            interaction.materials.forEach((material, index) => {
+                const defaults = interaction.defaults[index];
+                material.color.setHex(defaults.color);
+                material.opacity = defaults.opacity;
+            });
+
+            if (interaction.labelDefaults) {
+                interaction.element.style.background = interaction.labelDefaults.background;
+                interaction.element.style.color = interaction.labelDefaults.color;
+                interaction.element.style.boxShadow = interaction.labelDefaults.boxShadow;
+                interaction.element.style.borderColor = interaction.labelDefaults.borderColor;
+            }
+        }
+
+        function cleanupDimensionInteractions() {
+            if (activeInteraction) {
+                deactivateInteraction(activeInteraction);
+                activeInteraction = null;
+            }
+
+            while (dimensionInteractions.length) {
+                const interaction = dimensionInteractions.pop();
+                interaction.element.removeEventListener("click", interaction.handler);
+                interaction.element.classList.remove("is-active");
+                interaction.materials.forEach((material, index) => {
+                    const defaults = interaction.defaults[index];
+                    material.color.setHex(defaults.color);
+                    material.opacity = defaults.opacity;
+                });
+            }
+        }
+
+        function registerDimensionInteraction(group) {
+            const config = group?.userData?.highlightConfig;
+            const element = group?.userData?.labelElement;
+
+            if (!config || !element) {
+                return;
+            }
+
+            const interaction = {
+                element,
+                materials: config.materials,
+                defaults: config.defaults,
+                highlightColor: config.highlightColor,
+                highlightOpacity: config.highlightOpacity,
+                labelDefaults: config.labelDefaults,
+                labelHighlight: config.labelHighlight,
+                handler: null
+            };
+
+            element.style.pointerEvents = "auto";
+            element.style.cursor = "pointer";
+
+            interaction.handler = event => {
+                event.stopPropagation();
+
+                if (activeInteraction === interaction) {
+                    deactivateInteraction(interaction);
+                    activeInteraction = null;
+                    return;
+                }
+
+                if (activeInteraction) {
+                    deactivateInteraction(activeInteraction);
+                }
+
+                interaction.element.classList.add("is-active");
+                interaction.materials.forEach(material => {
+                    material.color.setHex(interaction.highlightColor);
+                    material.opacity = interaction.highlightOpacity;
+                });
+
+                if (interaction.labelHighlight) {
+                    interaction.element.style.background = interaction.labelHighlight.background;
+                    interaction.element.style.color = interaction.labelHighlight.color;
+                    interaction.element.style.boxShadow = interaction.labelHighlight.boxShadow;
+                    interaction.element.style.borderColor = interaction.labelHighlight.borderColor;
+                }
+
+                activeInteraction = interaction;
+            };
+
+            element.addEventListener("click", interaction.handler);
+            dimensionInteractions.push(interaction);
+        }
+
+        document.addEventListener("click", () => {
+            if (!activeInteraction) {
+                return;
+            }
+            deactivateInteraction(activeInteraction);
+            activeInteraction = null;
+        });
 
         function buildModel(params) {
             const { L, Sw, D, buildingHeight, depth, width, controlDistance, controlHeight, slopeLimitAtFront } = params;
             if (modelGroup) {
+                cleanupDimensionInteractions();
                 scene.remove(modelGroup);
             }
 
@@ -403,104 +555,104 @@
             const dimensionGroup = new THREE.Group();
             modelGroup.add(dimensionGroup);
 
-            dimensionGroup.add(
-                createDimensionLine(
-                    new THREE.Vector3(-width / 2, 0.12, -D),
-                    new THREE.Vector3(width / 2, 0.12, -D),
-                    `沿路寬度 W = ${formatNumber(width)} m`,
-                    {
-                        labelOffset: new THREE.Vector3(0, 2.8, 0),
-                        spriteOptions: { scale: 0.02, fontSize: 110 }
-                    }
-                )
+            const widthLine = createDimensionLine(
+                new THREE.Vector3(-width / 2, 0.12, -D),
+                new THREE.Vector3(width / 2, 0.12, -D),
+                `沿路寬度 W = ${formatNumber(width)} m`,
+                {
+                    labelOffset: new THREE.Vector3(0, 2.8, 0),
+                    spriteOptions: { scale: 0.02, fontSize: 110 }
+                }
             );
+            dimensionGroup.add(widthLine);
+            registerDimensionInteraction(widthLine);
 
-            dimensionGroup.add(
-                createDimensionLine(
-                    new THREE.Vector3(width / 2 + 0.6, 0.12, -D),
-                    new THREE.Vector3(width / 2 + 0.6, 0.12, -D - depth),
-                    `建築深度 T = ${formatNumber(depth)} m`,
-                    {
-                        labelOffset: new THREE.Vector3(0, 2.6, 0),
-                        spriteOptions: { scale: 0.02, fontSize: 110 }
-                    }
-                )
+            const depthLine = createDimensionLine(
+                new THREE.Vector3(width / 2 + 0.6, 0.12, -D),
+                new THREE.Vector3(width / 2 + 0.6, 0.12, -D - depth),
+                `建築深度 T = ${formatNumber(depth)} m`,
+                {
+                    labelOffset: new THREE.Vector3(0, 2.6, 0),
+                    spriteOptions: { scale: 0.02, fontSize: 110 }
+                }
             );
+            dimensionGroup.add(depthLine);
+            registerDimensionInteraction(depthLine);
 
-            dimensionGroup.add(
-                createDimensionLine(
-                    new THREE.Vector3(-width / 2 - 0.6, 0.12, 0),
-                    new THREE.Vector3(-width / 2 - 0.6, 0.12, -D),
-                    `退縮距離 D = ${formatNumber(D)} m`,
-                    {
-                        labelOffset: new THREE.Vector3(0, 2.6, 0),
-                        spriteOptions: { scale: 0.02, fontSize: 110 }
-                    }
-                )
+            const setbackDimensionLine = createDimensionLine(
+                new THREE.Vector3(-width / 2 - 0.6, 0.12, 0),
+                new THREE.Vector3(-width / 2 - 0.6, 0.12, -D),
+                `退縮距離 D = ${formatNumber(D)} m`,
+                {
+                    labelOffset: new THREE.Vector3(0, 2.6, 0),
+                    spriteOptions: { scale: 0.02, fontSize: 110 }
+                }
             );
+            dimensionGroup.add(setbackDimensionLine);
+            registerDimensionInteraction(setbackDimensionLine);
 
-            dimensionGroup.add(
-                createDimensionLine(
-                    new THREE.Vector3(width / 2, 0, -D - depth / 2),
-                    new THREE.Vector3(width / 2, buildingHeight, -D - depth / 2),
-                    `建築高度 BH = ${formatNumber(buildingHeight)} m`,
+            const heightLine = createDimensionLine(
+                new THREE.Vector3(width / 2, 0, -D - depth / 2),
+                new THREE.Vector3(width / 2, buildingHeight, -D - depth / 2),
+                `建築高度 BH = ${formatNumber(buildingHeight)} m`,
+                {
+                    labelOffset: new THREE.Vector3(2.4, 0, 0),
+                    spriteOptions: { scale: 0.02, fontSize: 110 },
+                    markerSize: 1.2
+                }
+            );
+            dimensionGroup.add(heightLine);
+            registerDimensionInteraction(heightLine);
+
+            const roadWidthLine = createDimensionLine(
+                new THREE.Vector3(width / 2 + 1.4, 0.12, 0),
+                new THREE.Vector3(width / 2 + 1.4, 0.12, Sw),
+                `道路寬度 Sw = ${formatNumber(Sw)} m`,
+                {
+                    labelOffset: new THREE.Vector3(0, 2.6, 0),
+                    spriteOptions: { scale: 0.02, fontSize: 110 }
+                }
+            );
+            dimensionGroup.add(roadWidthLine);
+            registerDimensionInteraction(roadWidthLine);
+
+            const controlDistanceLine = createDimensionLine(
+                new THREE.Vector3(-width / 2 - 1.4, 0.12, 0),
+                new THREE.Vector3(-width / 2 - 1.4, 0.12, params.controlDistance),
+                `斜率控制距離 = ${formatNumber(params.controlDistance)} m`,
+                {
+                    labelOffset: new THREE.Vector3(0, 2.6, 0),
+                    spriteOptions: { scale: 0.02, fontSize: 110 }
+                }
+            );
+            dimensionGroup.add(controlDistanceLine);
+            registerDimensionInteraction(controlDistanceLine);
+
+            const lengthLine = createDimensionLine(
+                new THREE.Vector3(-L / 2, 0.12, Sw + 2),
+                new THREE.Vector3(L / 2, 0.12, Sw + 2),
+                `基地沿路長 L = ${formatNumber(L)} m`,
+                {
+                    labelOffset: new THREE.Vector3(0, 2.8, 0),
+                    spriteOptions: { scale: 0.02, fontSize: 110 }
+                }
+            );
+            dimensionGroup.add(lengthLine);
+            registerDimensionInteraction(lengthLine);
+
+            if (params.H > 0) {
+                const heightLimitLine = createDimensionLine(
+                    new THREE.Vector3(-width / 2 - 2.4, 0, -D - depth / 2),
+                    new THREE.Vector3(-width / 2 - 2.4, params.H, -D - depth / 2),
+                    `高度限制 H = ${formatNumber(params.H)} m`,
                     {
-                        labelOffset: new THREE.Vector3(2.4, 0, 0),
+                        labelOffset: new THREE.Vector3(-2.2, 0, 0),
                         spriteOptions: { scale: 0.02, fontSize: 110 },
                         markerSize: 1.2
                     }
-                )
-            );
-
-            dimensionGroup.add(
-                createDimensionLine(
-                    new THREE.Vector3(width / 2 + 1.4, 0.12, 0),
-                    new THREE.Vector3(width / 2 + 1.4, 0.12, Sw),
-                    `道路寬度 Sw = ${formatNumber(Sw)} m`,
-                    {
-                        labelOffset: new THREE.Vector3(0, 2.6, 0),
-                        spriteOptions: { scale: 0.02, fontSize: 110 }
-                    }
-                )
-            );
-
-            dimensionGroup.add(
-                createDimensionLine(
-                    new THREE.Vector3(-width / 2 - 1.4, 0.12, 0),
-                    new THREE.Vector3(-width / 2 - 1.4, 0.12, params.controlDistance),
-                    `斜率控制距離 = ${formatNumber(params.controlDistance)} m`,
-                    {
-                        labelOffset: new THREE.Vector3(0, 2.6, 0),
-                        spriteOptions: { scale: 0.02, fontSize: 110 }
-                    }
-                )
-            );
-
-            dimensionGroup.add(
-                createDimensionLine(
-                    new THREE.Vector3(-L / 2, 0.12, Sw + 2),
-                    new THREE.Vector3(L / 2, 0.12, Sw + 2),
-                    `基地沿路長 L = ${formatNumber(L)} m`,
-                    {
-                        labelOffset: new THREE.Vector3(0, 2.8, 0),
-                        spriteOptions: { scale: 0.02, fontSize: 110 }
-                    }
-                )
-            );
-
-            if (params.H > 0) {
-                dimensionGroup.add(
-                    createDimensionLine(
-                        new THREE.Vector3(-width / 2 - 2.4, 0, -D - depth / 2),
-                        new THREE.Vector3(-width / 2 - 2.4, params.H, -D - depth / 2),
-                        `高度限制 H = ${formatNumber(params.H)} m`,
-                        {
-                            labelOffset: new THREE.Vector3(-2.2, 0, 0),
-                            spriteOptions: { scale: 0.02, fontSize: 110 },
-                            markerSize: 1.2
-                        }
-                    )
                 );
+                dimensionGroup.add(heightLimitLine);
+                registerDimensionInteraction(heightLimitLine);
             }
         }
 
